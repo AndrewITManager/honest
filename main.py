@@ -1,19 +1,16 @@
-# main.py
-import kivy
-kivy.require('2.1.0')
-
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
-from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
+from kivy.uix.scrollview import ScrollView
 import re
 from datetime import datetime
 
 class ЧестныйЗнакAPI:
     @staticmethod
-    def parse_qr_code(qr_data: str):
+    def parse_qr_code(qr_data):
         """Парсит данные QR кода"""
         result = {
             "raw": qr_data,
@@ -52,7 +49,7 @@ class ЧестныйЗнакAPI:
         return result
     
     @staticmethod
-    def compare_qr_codes(qr1_data: str, qr2_data: str):
+    def compare_qr_codes(qr1_data, qr2_data):
         """Сравнивает два QR кода"""
         qr1 = ЧестныйЗнакAPI.parse_qr_code(qr1_data)
         qr2 = ЧестныйЗнакAPI.parse_qr_code(qr2_data)
@@ -67,17 +64,22 @@ class ЧестныйЗнакAPI:
 
 class SingleCheckTab(BoxLayout):
     def __init__(self, **kwargs):
-        super().__init__(orientation='vertical', spacing=10, padding=20, **kwargs)
+        super().__init__(orientation='vertical', spacing=10, padding=10, **kwargs)
         
-        self.add_widget(Label(text="Проверка QR кода", font_size=24, size_hint_y=0.1))
+        # Заголовок
+        title = Label(text="Проверка QR кода", font_size=24, size_hint_y=0.1)
+        self.add_widget(title)
         
+        # Поле ввода
         self.qr_input = TextInput(
             hint_text="Введите QR код",
             size_hint_y=0.15,
-            multiline=False
+            multiline=False,
+            font_size=18
         )
         self.add_widget(self.qr_input)
         
+        # Кнопки
         btn_layout = BoxLayout(size_hint_y=0.15, spacing=10)
         
         check_btn = Button(text="Проверить", on_press=self.check_qr)
@@ -88,27 +90,44 @@ class SingleCheckTab(BoxLayout):
         
         self.add_widget(btn_layout)
         
-        self.result_label = Label(text="", size_hint_y=0.1)
+        # Результат
+        self.result_label = Label(text="", size_hint_y=0.1, font_size=16)
         self.add_widget(self.result_label)
         
-        self.details_label = Label(text="", size_hint_y=0.5)
-        self.add_widget(self.details_label)
+        # Детали
+        scroll = ScrollView(size_hint_y=0.6)
+        self.details_label = Label(
+            text="",
+            size_hint_y=None,
+            text_size=(None, None),
+            markup=True,
+            halign='left',
+            valign='top'
+        )
+        self.details_label.bind(texture_size=self.details_label.setter('size'))
+        scroll.add_widget(self.details_label)
+        self.add_widget(scroll)
     
     def check_qr(self, instance):
         qr_data = self.qr_input.text.strip()
         if not qr_data:
-            self.result_label.text = "Введите QR код"
+            self.result_label.text = "[color=ff0000]Введите QR код[/color]"
             return
         
         parsed = ЧестныйЗнакAPI.parse_qr_code(qr_data)
         
-        details = f"GTIN: {parsed['gtin'] or 'Не найден'}\n"
-        details += f"Серийный: {parsed['serial'] or 'Не найден'}\n"
-        details += f"Криптохвост: {parsed['crypto'] or 'Не найден'}\n"
-        details += f"Распознан: {'Да' if parsed['parsed_successfully'] else 'Нет'}"
+        if parsed["parsed_successfully"]:
+            self.result_label.text = "[color=00ff00]✓ QR код распознан[/color]"
+        else:
+            self.result_label.text = "[color=ff0000]✗ Не удалось распознать[/color]"
+        
+        details = f"[b]Результат анализа:[/b]\n\n"
+        details += f"GTIN: [b]{parsed['gtin'] or 'Не найден'}[/b]\n"
+        details += f"Серийный номер: [b]{parsed['serial'] or 'Не найден'}[/b]\n"
+        details += f"Криптохвост: [b]{parsed['crypto'] or 'Не найден'}[/b]\n"
+        details += f"\n[i]Время: {datetime.now().strftime('%H:%M:%S')}[/i]"
         
         self.details_label.text = details
-        self.result_label.text = "Результат проверки"
     
     def clear_fields(self, instance):
         self.qr_input.text = ""
@@ -117,25 +136,32 @@ class SingleCheckTab(BoxLayout):
 
 class ComparisonTab(BoxLayout):
     def __init__(self, **kwargs):
-        super().__init__(orientation='vertical', spacing=10, padding=20, **kwargs)
+        super().__init__(orientation='vertical', spacing=10, padding=10, **kwargs)
         
-        self.add_widget(Label(text="Сравнение QR кодов", font_size=24, size_hint_y=0.1))
+        # Заголовок
+        title = Label(text="Сравнение QR кодов", font_size=24, size_hint_y=0.1)
+        self.add_widget(title)
         
-        # Первый QR
+        # Поля ввода
+        input_layout = BoxLayout(orientation='vertical', spacing=5, size_hint_y=0.3)
+        
         self.qr1_input = TextInput(
             hint_text="Первый QR код",
-            size_hint_y=0.1,
-            multiline=False
+            size_hint_y=0.45,
+            multiline=False,
+            font_size=18
         )
-        self.add_widget(self.qr1_input)
+        input_layout.add_widget(self.qr1_input)
         
-        # Второй QR
         self.qr2_input = TextInput(
             hint_text="Второй QR код",
-            size_hint_y=0.1,
-            multiline=False
+            size_hint_y=0.45,
+            multiline=False,
+            font_size=18
         )
-        self.add_widget(self.qr2_input)
+        input_layout.add_widget(self.qr2_input)
+        
+        self.add_widget(input_layout)
         
         # Кнопки
         btn_layout = BoxLayout(size_hint_y=0.15, spacing=10)
@@ -151,6 +177,7 @@ class ComparisonTab(BoxLayout):
         
         self.add_widget(btn_layout)
         
+        # Результат
         self.result_label = Label(
             text="",
             size_hint_y=0.1,
@@ -159,64 +186,35 @@ class ComparisonTab(BoxLayout):
         )
         self.add_widget(self.result_label)
         
-        self.details_label = Label(text="", size_hint_y=0.45)
-        self.add_widget(self.details_label)
-    
-    def compare_qr(self, instance):
-        qr1 = self.qr1_input.text.strip()
-        qr2 = self.qr2_input.text.strip()
-        
-        if not qr1 or not qr2:
-            self.result_label.text = "Введите оба QR кода"
-            return
-        
-        result = ЧестныйЗнакAPI.compare_qr_codes(qr1, qr2)
-        
-        if result["match"]:
-            self.result_label.text = "✅ СООТВЕТСТВУЕТ"
-            self.result_label.color = (0, 1, 0, 1)  # Зеленый
-        else:
-            self.result_label.text = "❌ НЕ СООТВЕТСТВУЕТ"
-            self.result_label.color = (1, 0, 0, 1)  # Красный
-        
-        details = "Первый QR:\n"
-        details += f"GTIN: {result['qr1']['gtin']}\n"
-        details += f"Серийный: {result['qr1']['serial']}\n\n"
-        
-        details += "Второй QR:\n"
-        details += f"GTIN: {result['qr2']['gtin']}\n"
-        details += f"Серийный: {result['qr2']['serial']}"
-        
-        self.details_label.text = details
-    
-    def swap_qr(self, instance):
-        qr1 = self.qr1_input.text
-        qr2 = self.qr2_input.text
-        self.qr1_input.text = qr2
-        self.qr2_input.text = qr1
-    
-    def clear_fields(self, instance):
-        self.qr1_input.text = ""
-        self.qr2_input.text = ""
-        self.result_label.text = ""
-        self.details_label.text = ""
+        # Детали
+        scroll = ScrollView(size_hint_y=0.35)
+        self.details_label = Label(
+            text="",
+            size_hint_y=None,
+            text_size=(None, None),
+            markup=True,
+            halign='left',
+            valign='top'
+        )
+        self.details_label.bind(texture_size=self.details_label.setter('size'))
+        scroll.add_widget(self.details_label)
+        self.add_widget(scroll)
 
 class ЧестныйЗнакApp(App):
     def build(self):
-        self.title = "Честный Знак Проверка"
+        self.title = "Честный Знак"
         
         # Создаем панель с вкладками
-        tab_panel = TabbedPanel()
-        tab_panel.do_default_tab = False
+        tab_panel = TabbedPanel(do_default_tab=False)
         
         # Первая вкладка
         tab1 = TabbedPanelItem(text='Проверка QR')
-        tab1.content = SingleCheckTab()
+        tab1.add_widget(SingleCheckTab())
         tab_panel.add_widget(tab1)
         
         # Вторая вкладка
         tab2 = TabbedPanelItem(text='Сравнение QR')
-        tab2.content = ComparisonTab()
+        tab2.add_widget(ComparisonTab())
         tab_panel.add_widget(tab2)
         
         return tab_panel
